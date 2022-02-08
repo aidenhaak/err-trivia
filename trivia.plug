@@ -1,0 +1,6 @@
+[Core]
+Name = Trivia
+Module = trivia
+
+[Documentation]
+Description = Runs a trivia competition
