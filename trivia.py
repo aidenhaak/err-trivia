@@ -8,26 +8,37 @@ import random
 import math
 import sqlite3
 from contextlib import closing
+from itertools import chain
 
-TIME_BETWEEN_HINTS_SECONDS = 5
-TIME_BETWEEN_QUESTIONS_SECONDS = 5
-DATABASE_PATH = "./trivia.db"
+CONFIG_TEMPLATE = {
+    "TRIVIA_DATABASE_PATH": "./trivia.db",
+    "TRIVIA_HINT_DELAY_SECONDS": 5,
+    "TRIVIA_QUESTION_DELAY_SECONDS": 5
+}
 
-class Trivia(BotPlugin):
+class TriviaPlugin(BotPlugin):
     def activate(self) -> None:
         super().activate()
         self._games = dict()
 
         # TODO prevent threading issues re-using this connection between timer threads
-        self.db_connection = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+        database_path = self.config['TRIVIA_DATABASE_PATH']
+        self.db_connection = sqlite3.connect(database_path, check_same_thread=False)
 
     def deactivate(self) -> None:
         super().deactivate()
         self.db_connection.close()
 
     def get_configuration_template(self):
-        # TODO add configuration template
-        pass
+        return CONFIG_TEMPLATE
+
+    def configure(self, configuration):
+        if configuration is not None and configuration != {}:
+            config = dict(chain(CONFIG_TEMPLATE.items(), configuration.items()))
+        else:
+            config = CONFIG_TEMPLATE
+
+        super(TriviaPlugin, self).configure(config)
 
     @botcmd(admin_only=True)
     @arg_botcmd("num_questions", type = int, default = 10)
@@ -37,12 +48,14 @@ class Trivia(BotPlugin):
            return
 
         room_name = str(message.to)
-        game = self._games.get(room_name, Game(self.db_connection, room_name, num_questions, partial(self.send, message.to)))
+        hint_delay_seconds = self.config['TRIVIA_HINT_DELAY_SECONDS']
+        question_delay_seconds = self.config['TRIVIA_QUESTION_DELAY_SECONDS']
+        game = self._games.get(room_name, Game(self.db_connection, room_name, num_questions, hint_delay_seconds, question_delay_seconds, partial(self.send, message.to)))
         if game.in_progress:
             # A trivia game is already in progress in room
             return
 
-        game.start()
+        game.start(hint_delay_seconds, question_delay_seconds)
         self._games[room_name] = game
 
         self.log.info(f"Trivia game started in {message.to} by {message.frm}")
@@ -315,14 +328,15 @@ class GameStatistics:
         return cursor.lastrowid
 
 class Game:
-    def __init__(self, db_connection: sqlite3.Connection, game_name: str, num_questions: int, send_message):
+    def __init__(self, db_connection: sqlite3.Connection, game_name: str, hint_delay_seconds: int, question_delay_seconds: int, num_questions: int, send_message):
         self.db_connection = db_connection
         self.game_name = game_name
         self.num_questions = num_questions
         self.send_message = send_message
         self.in_progress = False
-
-        self.question_timer = Timer(TIME_BETWEEN_QUESTIONS_SECONDS, self._ask_question)
+        self.hint_delay_seconds = hint_delay_seconds
+        self.question_delay_seconds = question_delay_seconds
+        self.question_timer = Timer(question_delay_seconds, self._ask_question)
         self.current_question = None
 
     def answer(self, user_name: str, guess: str) -> None:
@@ -337,8 +351,10 @@ class Game:
     def skip(self):
         self.current_question.question_completed.set()
 
-    def start(self) -> None:
+    def start(self, hint_delay_seconds: int, question_delay_seconds: int) -> None:
         self.in_progress = True
+        self.hint_delay_seconds = hint_delay_seconds
+        self.question_delay_seconds = question_delay_seconds
         self.game_statistics = GameStatistics(self.db_connection, self.game_name)
         self.questions = iter(Questions(self.db_connection, self.num_questions))
         self._restart_question_timer()
@@ -377,7 +393,7 @@ class Game:
             return
         
         self.question_timer.cancel()
-        self.question_timer = Timer(TIME_BETWEEN_QUESTIONS_SECONDS, self._ask_question)
+        self.question_timer = Timer(self.question_delay_seconds, self._ask_question)
         self.current_question = None
         self.question_timer.start()
 
@@ -385,7 +401,7 @@ class Game:
         if question is None:
             return
 
-        question.question_completed.wait(TIME_BETWEEN_HINTS_SECONDS)
+        question.question_completed.wait(self.hint_delay_seconds)
         if not question.question_completed.is_set() and self.in_progress:
             self.send_message(f"Answer: {question.answer}")
 
@@ -393,7 +409,7 @@ class Game:
         if question is None:
             return
 
-        question.question_completed.wait(TIME_BETWEEN_HINTS_SECONDS)
+        question.question_completed.wait(self.hint_delay_seconds)
         if not question.question_completed.is_set() and self.in_progress:
             hint = question.hints[difficulty]
             self.send_message(f"Hint: {hint}")

@@ -117,7 +117,15 @@ Removes an alias if it exists.
 
 Lists any aliases for the specified nick.
 
-## Recommend Configuration
+## Configuration
+
+You can configure the trivia plugin by sending the bot the following command:
+
+```
+!plugin config Trivia { 'TRIVIA_HINT_DELAY_SECONDS': 5, 'TRIVIA_QUESTION_DELAY_SECONDS': 5, 'TRIVIA_DATABASE_PATH': './trivia.db' }
+```
+
+### Limiting Access
 
 It's probably a good idea to limit everything except the `!stats` and `!hof` commands to bot admins. This can be done by adding the following to your `config.py` file:
 
