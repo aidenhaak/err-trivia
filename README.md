@@ -19,7 +19,6 @@ trivbot> Correct!
 
 TODO:
   - Scrambled word questions
-  - Script for importing questions (probably from a CSV) into the SQLite database
   - Fix suspect multi-threading with SQLite connection
   - Tests
 
@@ -28,6 +27,22 @@ TODO:
 ```
 !repos install https://github.com/aidenhaak/err-trivia.git
 ```
+
+## Creating a Database File
+
+Run the import script in the util folder:
+
+```shell
+./util/import_questions.py -i questions.csv -o trivia.db
+```
+
+The CSV file should match the format of the `example_questions.csv` file. Each row should match the following pattern:
+
+```
+"Question?","Answer"
+```
+
+This script will either create a new SQLite database with the questions or import the questions into an existing database.
 
 ## Available Commands
 
