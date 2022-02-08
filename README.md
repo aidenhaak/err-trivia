@@ -8,17 +8,21 @@ A trivia plugin for [Errbot](http://errbot.io/). Features include:
 
 Example game:
 ```
-<aiden> !trivia start 1
+<aiden> !trivia start 2
 <trivbot> What is the capital of Canada?
 <trivbot> Hint: O--a--
 <trivbot> Hint: Ot-a-a
 <aiden> ottawa
-trivbot> Correct!
+<trivbot> Correct!
+<trivbot> Unscramble this word: l n b c e m a u a
+<trivbot> Hint: --b-l-n--
+<trivbot> Hint: -mb-l-nc-
+<trivbot> Hint: amb-l-nce
+<trivbot> Answer: ambulance
 <trivbot> Game finished! Stats: aiden: 1 point(s)
 ```
 
 TODO:
-  - Scrambled word questions
   - Fix suspect multi-threading with SQLite connection
   - Tests
 
@@ -33,7 +37,7 @@ TODO:
 Run the import script in the util folder:
 
 ```shell
-./util/import_questions.py -i questions.csv -o trivia.db
+./util/import_questions.py -q questions.csv -w words.txt -o trivia.db
 ```
 
 The CSV file should match the format of the `example_questions.csv` file. Each row should match the following pattern:
@@ -42,7 +46,14 @@ The CSV file should match the format of the `example_questions.csv` file. Each r
 "Question?","Answer"
 ```
 
-This script will either create a new SQLite database with the questions or import the questions into an existing database.
+The words file should match the format of the `example_words.txt` file. Each line should have a separate line:
+
+```
+Word1
+Word2
+```
+
+This script will either create a new SQLite database or import the questions and scrambled into an existing database.
 
 ## Available Commands
 
@@ -122,7 +133,7 @@ Lists any aliases for the specified nick.
 You can configure the trivia plugin by sending the bot the following command:
 
 ```
-!plugin config Trivia { 'TRIVIA_HINT_DELAY_SECONDS': 5, 'TRIVIA_QUESTION_DELAY_SECONDS': 5, 'TRIVIA_DATABASE_PATH': './trivia.db' }
+!plugin config Trivia { 'HINT_DELAY_SECONDS': 5, 'QUESTION_DELAY_SECONDS': 5, 'DATABASE_PATH': './trivia.db' }
 ```
 
 ### Limiting Access

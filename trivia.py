@@ -11,9 +11,9 @@ from contextlib import closing
 from itertools import chain
 
 CONFIG_TEMPLATE = {
-    "TRIVIA_DATABASE_PATH": "./trivia.db",
-    "TRIVIA_HINT_DELAY_SECONDS": 5,
-    "TRIVIA_QUESTION_DELAY_SECONDS": 5
+    "DATABASE_PATH": "./trivia.db",
+    "HINT_DELAY_SECONDS": 5,
+    "QUESTION_DELAY_SECONDS": 5,
 }
 
 class TriviaPlugin(BotPlugin):
@@ -22,7 +22,7 @@ class TriviaPlugin(BotPlugin):
         self._games = dict()
 
         # TODO prevent threading issues re-using this connection between timer threads
-        database_path = self.config['TRIVIA_DATABASE_PATH']
+        database_path = self.config['DATABASE_PATH']
         self.db_connection = sqlite3.connect(database_path, check_same_thread=False)
 
     def deactivate(self) -> None:
@@ -48,8 +48,8 @@ class TriviaPlugin(BotPlugin):
            return
 
         room_name = str(message.to)
-        hint_delay_seconds = self.config['TRIVIA_HINT_DELAY_SECONDS']
-        question_delay_seconds = self.config['TRIVIA_QUESTION_DELAY_SECONDS']
+        hint_delay_seconds = self.config['HINT_DELAY_SECONDS']
+        question_delay_seconds = self.config['QUESTION_DELAY_SECONDS']
         game = self._games.get(room_name, Game(self.db_connection, room_name, num_questions, hint_delay_seconds, question_delay_seconds, partial(self.send, message.to)))
         if game.in_progress:
             # A trivia game is already in progress in room
@@ -221,13 +221,40 @@ class Questions:
 
     def __iter__(self):
         with closing(self.db_connection.cursor()) as cursor:
-            query = """
-                SELECT Question, Answer
-                FROM Questions
-                ORDER BY RANDOM() LIMIT :num_questions
-            """
-            for row in cursor.execute(query, { "num_questions": self.num_questions }):
-                yield Question(row[0], row[1])
+            num_questions = round(self.num_questions * 0.7)
+            questions = self._get_questions(cursor, num_questions)
+            num_scrambled_words = min(round(self.num_questions * 0.3), self.num_questions - num_questions)
+            scrambled_words = self._get_scrambled_word_questions(cursor, num_scrambled_words)
+
+            lst = list(chain(questions, scrambled_words))
+            random.shuffle(lst)
+            return iter(lst)
+
+
+    def _get_questions(self, cursor: sqlite3.Cursor, n: int):
+        query = """
+            SELECT Question, Answer
+            FROM Questions
+            ORDER BY RANDOM() LIMIT ?
+        """
+        for row in cursor.execute(query, [n]):
+            yield Question(row[0], row[1])
+
+    def _get_scrambled_word_questions(self, cursor: sqlite3.Cursor, n: int):
+        query = """
+            SELECT LOWER(Word)
+            FROM ScrambledWords
+            ORDER BY RANDOM() LIMIT ?
+        """
+        for row in cursor.execute(query, [n]):
+            word = row[0]
+            yield Question(f"Unscramble this word: {self._scramble(word)}", word)
+
+    def _scramble(self, word):
+        l = list(word)
+        random.shuffle(l)
+        return " ".join(l)
+
 
 class GameStatistics:
     def __init__(self, db_connection: sqlite3.Connection, game_name: str):
