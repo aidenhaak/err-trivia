@@ -50,7 +50,7 @@ class TriviaPlugin(BotPlugin):
         room_name = str(message.to)
         hint_delay_seconds = self.config['HINT_DELAY_SECONDS']
         question_delay_seconds = self.config['QUESTION_DELAY_SECONDS']
-        game = self._games.get(room_name, Game(self.db_connection, room_name, num_questions, hint_delay_seconds, question_delay_seconds, partial(self.send, message.to)))
+        game = self._games.get(room_name, Game(self.db_connection, room_name, hint_delay_seconds, question_delay_seconds, num_questions, partial(self.send, message.to)))
         if game.in_progress:
             # A trivia game is already in progress in room
             return
@@ -371,7 +371,7 @@ class Game:
             return
 
         if guess.casefold() == self.current_question.answer.casefold():
-            self.send_message("Correct!")
+            self.send_message(f"{user_name} - Correct!")
             self.current_question.question_completed.set()
             self.game_statistics.add_point_to_user(user_name)
 
@@ -383,7 +383,8 @@ class Game:
         self.hint_delay_seconds = hint_delay_seconds
         self.question_delay_seconds = question_delay_seconds
         self.game_statistics = GameStatistics(self.db_connection, self.game_name)
-        self.questions = iter(Questions(self.db_connection, self.num_questions))
+        self.questions = enumerate(Questions(self.db_connection, self.num_questions))
+        self.send_message(f"Starting a trivia game with {self.num_questions} questions...")
         self._restart_question_timer()
 
     def stop(self) -> None:
@@ -391,7 +392,7 @@ class Game:
         self.question_timer.cancel()
 
     def _ask_question(self) -> None:
-        current_question = next(self.questions, None)
+        question_index, current_question = next(self.questions, None)
         if current_question is None:
             self.in_progress = False
 
@@ -407,7 +408,7 @@ class Game:
         self.current_question = current_question
 
         if self.in_progress:
-            self.send_message(current_question.question)
+            self.send_message(f"Q{question_index + 1}: {current_question.question}")
 
         self._send_hint(current_question, HintDifficulty.HARD)
         self._send_hint(current_question, HintDifficulty.MEDIUM)

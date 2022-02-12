@@ -42,7 +42,7 @@ def import_scrambled_words(conn, words_file):
 
         with closing(conn.cursor()) as cursor:
             for line in file:
-                cursor.execute(query, [line])
+                cursor.execute(query, [line.strip()])
 
 if __name__ == "__main__":
     questions_file, words_file, output_file = parse_args()
