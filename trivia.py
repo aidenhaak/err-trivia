@@ -12,7 +12,7 @@ from itertools import chain
 
 CONFIG_TEMPLATE = {
     "DATABASE_PATH": "./trivia.db",
-    "HINT_DELAY_SECONDS": 5,
+    "HINT_DELAY_SECONDS": 10,
     "QUESTION_DELAY_SECONDS": 5,
 }
 
@@ -392,7 +392,7 @@ class Game:
         self.question_timer.cancel()
 
     def _ask_question(self) -> None:
-        question_index, current_question = next(self.questions, None)
+        question_index, current_question = next(self.questions, (None, None))
         if current_question is None:
             self.in_progress = False
 
